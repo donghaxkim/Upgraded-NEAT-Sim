@@ -45,12 +45,21 @@ AGENT_RADIUS = 10
 AGENT_SPEED = 3
 AGENT_ENERGY = 100
 ENERGY_DECAY = 0.1
+VISION_RANGE = 100
+VISION_ANGLE = 120
+MEMORY_SIZE = 3
 
 # Food parameters
 FOOD_RADIUS = 5
 FOOD_ENERGY = 50
 FOOD_COUNT = 20
 
+# Predator parameters
+PREDATOR_RADIUS = 15
+PREDATOR_SPEED = 4
+PREDATOR_ENERGY = 150
+PREDATOR_COUNT = 2
+
 # Neural network inputs
-NUM_INPUTS = 8  # Distance to nearest food, angle to food, current energy, etc.
-NUM_OUTPUTS = 2  # Movement direction and speed 
+NUM_INPUTS = 14  # Distance to food, angle to food, vision inputs, memory, energy, etc.
+NUM_OUTPUTS = 2  # Movement direction and speed

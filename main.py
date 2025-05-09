@@ -11,12 +11,22 @@ from config import *
 def create_agents(config, pop_size):
     """Create a population of agents"""
     agents = []
+    # Create prey
     for _ in range(pop_size):
         x = random.randint(AGENT_RADIUS, WINDOW_WIDTH - AGENT_RADIUS)
         y = random.randint(AGENT_RADIUS, WINDOW_HEIGHT - AGENT_RADIUS)
-        genome = neat.DefaultGenome(0)  # Create a new genome with ID 0
-        genome.configure_new(config.genome_config)  # Configure it with our settings
-        agents.append(Agent(x, y, genome, config))
+        genome = neat.DefaultGenome(0)
+        genome.configure_new(config.genome_config)
+        agents.append(Agent(x, y, genome, config, is_predator=False))
+    
+    # Create predators
+    for _ in range(PREDATOR_COUNT):
+        x = random.randint(PREDATOR_RADIUS, WINDOW_WIDTH - PREDATOR_RADIUS)
+        y = random.randint(PREDATOR_RADIUS, WINDOW_HEIGHT - PREDATOR_RADIUS)
+        genome = neat.DefaultGenome(0)
+        genome.configure_new(config.genome_config)
+        agents.append(Agent(x, y, genome, config, is_predator=True))
+    
     return agents
 
 def main():
@@ -48,7 +58,6 @@ def main():
                 if event.key == pygame.K_SPACE:
                     paused = not paused
                 elif event.key == pygame.K_r:
-                    # Reset simulation
                     agents = create_agents(config, config.pop_size)
                     environment.reset()
                     visualizer = Visualizer(screen)
@@ -59,27 +68,51 @@ def main():
             # Update environment and agents
             environment.update(agents)
             for agent in agents:
-                agent.update(environment.foods)
+                agent.update(environment.foods, agents)
 
-            # Check if all agents are dead
-            if all(not agent.alive for agent in agents):
+            # Handle predator-prey interactions
+            for predator in [a for a in agents if a.is_predator and a.alive]:
+                for prey in [a for a in agents if not a.is_predator and a.alive]:
+                    dist = np.sqrt((predator.x - prey.x)**2 + (predator.y - prey.y)**2)
+                    if dist < predator.radius + prey.radius:
+                        prey.alive = False
+                        predator.fitness += 5
+                        predator.energy += FOOD_ENERGY
+
+            # Check if all prey are dead
+            if all(not agent.alive for agent in agents if not agent.is_predator):
                 # Create next generation
                 visualizer.increment_generation()
                 
-                # Select best genomes
-                genomes = [(agent.genome, agent.fitness) for agent in agents]
-                genomes.sort(key=lambda x: x[1], reverse=True)
+                # Separate predators and prey
+                prey_genomes = [(a.genome, a.fitness) for a in agents if not a.is_predator]
+                pred_genomes = [(a.genome, a.fitness) for a in agents if a.is_predator]
+                
+                prey_genomes.sort(key=lambda x: x[1], reverse=True)
+                pred_genomes.sort(key=lambda x: x[1], reverse=True)
                 
                 # Create new population
                 new_agents = []
+                
+                # New prey
                 for i in range(config.pop_size):
-                    parent = random.choice(genomes[:config.pop_size//2])[0]
-                    child = neat.DefaultGenome(i)  # Create new genome with unique ID
-                    child.configure_crossover(parent, parent, config.genome_config)  # Self-crossover
-                    child.mutate(config.genome_config)  # Mutate the child
+                    parent = random.choice(prey_genomes[:config.pop_size//2])[0]
+                    child = neat.DefaultGenome(i)
+                    child.configure_crossover(parent, parent, config.genome_config)
+                    child.mutate(config.genome_config)
                     x = random.randint(AGENT_RADIUS, WINDOW_WIDTH - AGENT_RADIUS)
                     y = random.randint(AGENT_RADIUS, WINDOW_HEIGHT - AGENT_RADIUS)
-                    new_agents.append(Agent(x, y, child, config))
+                    new_agents.append(Agent(x, y, child, config, is_predator=False))
+                
+                # New predators
+                for i in range(PREDATOR_COUNT):
+                    parent = random.choice(pred_genomes[:PREDATOR_COUNT//2])[0]
+                    child = neat.DefaultGenome(i + config.pop_size)
+                    child.configure_crossover(parent, parent, config.genome_config)
+                    child.mutate(config.genome_config)
+                    x = random.randint(PREDATOR_RADIUS, WINDOW_WIDTH - PREDATOR_RADIUS)
+                    y = random.randint(PREDATOR_RADIUS, WINDOW_HEIGHT - PREDATOR_RADIUS)
+                    new_agents.append(Agent(x, y, child, config, is_predator=True))
                 
                 agents = new_agents
                 environment.reset()
@@ -105,4 +138,4 @@ def main():
     pygame.quit()
 
 if __name__ == "__main__":
-    main() 
+    main()
